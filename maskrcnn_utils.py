@@ -107,9 +107,7 @@ class Dataset(utils.Dataset):
         for obj in objects:
             roi = obj['roi']
             mcrop = label_img[roi[0]:roi[2]+1, roi[1]:roi[3]+1]
-            #if ~((mcrop.astype(np.bool) & obj['mask'].astype(np.bool)).any()):
-            # If < 10% overlap
-            if (mcrop.astype(np.bool) & obj['mask'].astype(np.bool)).sum() < (mcrop.astype(np.bool) | obj['mask'].astype(np.bool)).sum():
+            if ~((mcrop.astype(np.bool) & obj['mask'].astype(np.bool)).any()):
                 objnum += 1
                 (obj['mask'])[obj['mask'] > 0] = objnum
                 (obj['mask'])[mcrop > 0] = 0
