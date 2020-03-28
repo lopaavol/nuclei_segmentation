@@ -1,7 +1,9 @@
 import os
 from operator import itemgetter
 import skimage
-import skimage.morphology
+import skimage.io
+import skimage.color
+import skimage.transform
 import numpy as np
 from mrcnn import config as config
 from mrcnn import utils as utils
@@ -84,7 +86,6 @@ class Dataset(utils.Dataset):
             for i in range(tile['rois'].shape[0]):
                 m_coords = tile['rois'][i]
                 mask = tile['masks'][:,:,i]
-                mask = skimage.morphology.binary_erosion(mask, skimage.morphology.disk(1))
                 mrows = np.any(mask, axis=1)
                 mcols = np.any(mask, axis=0)
                 try:
