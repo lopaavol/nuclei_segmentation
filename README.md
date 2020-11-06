@@ -2,7 +2,7 @@
 Python utilities to apply pre-trained Mask R-CNN model for nuclei segmentation.
 
 The Mask R-CNN implementation is based on Matterport Mask R-CNN v2.1:\
-https://github.com/matterport/Mask_RCNN\
+https://github.com/matterport/Mask_RCNN \
 The code is now included in mrcnn directory due to minor modifications so there is no need to separately install Matterport Mask R-CNN.
 
 Requirements:
