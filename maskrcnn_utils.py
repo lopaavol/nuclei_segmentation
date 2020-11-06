@@ -1,4 +1,5 @@
 import os
+import math
 from operator import itemgetter
 import skimage
 import skimage.io
@@ -20,10 +21,11 @@ class InferenceConfig(config.Config):
     IMAGE_MIN_DIM = min(IMAGE_SIZE)
     IMAGE_MAX_DIM = max(IMAGE_SIZE)
     RPN_NMS_THRESHOLD = 0.7
-    POST_NMS_ROIS_INFERENCE = 1000
+    POST_NMS_ROIS_INFERENCE = 5000
     DETECTION_MAX_INSTANCES = 500
     DETECTION_MIN_CONFIDENCE = 0.5
     DETECTION_NMS_THRESHOLD = 0.5
+    DETECTION_FG_THRESHOLD = 0.25 # Threshold for fg object probability
 
     def __init__(self):
         config.Config.__init__(self)
@@ -33,6 +35,7 @@ class Dataset(utils.Dataset):
         utils.Dataset.__init__(self)
         self.orig_size = {}
         self.tile_coords = {}
+        self.tile_overlap = 0
 
     def load_files(self, files):
         self.add_class("segmentation", 1, "cell")
@@ -45,21 +48,32 @@ class Dataset(utils.Dataset):
     def load_image(self, image_id, tile_overlap = 0):
         image = skimage.io.imread(self.image_info[image_id]['path'])
         if image.ndim == 2:
+            # Rescale
+            imean = image.mean()
+            istd = image.std()
+            image = image.astype(np.float32)
+            image[image > imean+3*istd] = imean+3*istd
+            image[image < imean-3*istd] = imean-3*istd
+            image = (image - image.min()) * 255 / (image.max() - image.min())
+            image = image.astype(np.uint8)
+            # End rescale
             image = skimage.color.gray2rgb(image)
         self.orig_size[image_id] = image.shape[:2]
-        tiles = self.crop_tiles(image_id, image, tile_overlap)
-        return tiles
-
-    def crop_tiles(self, image_id, image, tile_overlap = 0):
+        
         # All tiles need to be IMAGE_SIZE for prediction
         if tile_overlap > max(IMAGE_SIZE) / 2:
             tile_overlap = max(IMAGE_SIZE) / 2
+        self.tile_overlap = tile_overlap
+        tiles = self.crop_tiles(image_id, image)
+        
+        return tiles
 
+    def crop_tiles(self, image_id, image):
         tile_coords = []
         tiles = []
         if image.shape[0] > IMAGE_SIZE[0] or image.shape[1] > IMAGE_SIZE[1]:
-            for y in range(0, image.shape[0], IMAGE_SIZE[0]-tile_overlap):
-                for x in range(0, image.shape[1], IMAGE_SIZE[1]-tile_overlap):
+            for y in range(0, image.shape[0], IMAGE_SIZE[0]-self.tile_overlap):
+                for x in range(0, image.shape[1], IMAGE_SIZE[1]-self.tile_overlap):
                     xcoord = x
                     ycoord = y
                     if (xcoord + IMAGE_SIZE[1] >= image.shape[1]) and (xcoord != 0):
@@ -77,7 +91,7 @@ class Dataset(utils.Dataset):
         self.tile_coords[image_id] = tile_coords
         return tiles
 
-    def merge_tiles(self, image_id, tile_masks):
+    def merge_tiles(self, image_id, tile_masks, filter_edge=True):
         orig_size = self.get_orig_size(image_id)
         label_img = np.zeros(orig_size, dtype=np.uint16)
         tile_coords = self.tile_coords[image_id]
@@ -92,6 +106,9 @@ class Dataset(utils.Dataset):
                     rmin,rmax = np.where(mrows)[0][[0, -1]]
                     cmin,cmax = np.where(mcols)[0][[0, -1]]
                 except:
+                    continue
+
+                if (rmin < self.tile_overlap // 10 or cmin < self.tile_overlap // 10 or rmax > IMAGE_SIZE[0] - self.tile_overlap // 10 or cmax > IMAGE_SIZE[1] - self.tile_overlap // 10) and filter_edge: # Filter out objects touching/close to edge
                     continue
                 
                 mask = mask[rmin:rmax+1, cmin:cmax+1].astype(np.uint16)
@@ -108,10 +125,10 @@ class Dataset(utils.Dataset):
         for obj in objects:
             roi = obj['roi']
             mcrop = label_img[roi[0]:roi[2]+1, roi[1]:roi[3]+1]
+            
             if ~((mcrop.astype(np.bool) & obj['mask'].astype(np.bool)).any()):
                 objnum += 1
                 (obj['mask'])[obj['mask'] > 0] = objnum
-                (obj['mask'])[mcrop > 0] = 0
                 mcrop = mcrop + obj['mask']
                 label_img[roi[0]:roi[2]+1, roi[1]:roi[3]+1] = mcrop
         
