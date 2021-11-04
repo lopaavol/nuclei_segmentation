@@ -4,6 +4,7 @@ import glob
 import imageio
 import numpy as np
 from tqdm import tqdm
+from pathlib import Path
 from maskrcnn_utils import InferenceConfig
 from maskrcnn_utils import Dataset
 from mrcnn import model as modellib
@@ -15,7 +16,12 @@ def main():
     model_dir = '.'
     overlap = 128
     filter_edge = True
-    files = glob.glob(os.path.join(inpath,'*.tif'))
+
+    ipath = Path(inpath)
+    opath = Path(outpath)
+    files = ipath.rglob('*DAPI*.tif')
+    files = [x for x in files]
+
     dataset = Dataset()
     dataset.load_files(files)
     dataset.prepare()
@@ -37,7 +43,8 @@ def main():
             tile_masks.append(mask)
 
         mask_img = dataset.merge_tiles(image_id, tile_masks, filter_edge=filter_edge)
-        imageio.imwrite(os.path.join(outpath,os.path.basename(files[i])), mask_img)
+        suffix = files[i].suffix
+        imageio.imwrite(opath / files[i].name.replace(suffix,'.png'), mask_img)
 
 
 if __name__ == "__main__":
