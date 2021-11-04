@@ -12,4 +12,4 @@ https://github.com/leekunhee/Mask_RCNN
 - Some other typical Python libraries such as numpy, skimage, imageio,...
 
 ## Installation
-Clone the repository, download the pre-trained weights, and rename either mrcnn_tf1 or mrcnn_tf2 to 'mrcnn' depending on the version of TensorFlow that is installed into your machine.
+Clone the repository, download the pre-trained weights, and rename either mrcnn_tf1 or mrcnn_tf2 to 'mrcnn' depending on the installed TensorFlow version.
